@@ -37,6 +37,18 @@ def call_history(method: Callable) -> Callable:
 
     return wrapper
 
+def replay(method: Callable) -> None:
+    redis_client = redis.Redis()
+    method_name = method.__qualname__
+
+    calls = int(redis_client.get(f"{method_name}:calls") or 0)
+    inputs = redis_client.lrange(f"{method_name}:inputs", 0, -1)
+    outputs = redis_client.lrange(f"{method_name}:outputs", 0, -1)
+
+    print(f"{method_name} was called {calls} times:")
+    for inp, outp in zip(inputs, outputs):
+        print(f"{method_name}(*{inp.decode('utf-8')}) -> {outp.decode('utf-8')}")
+
 class Cache:
     def __init__(self):
         self._redis = redis.Redis()
@@ -65,12 +77,7 @@ class Cache:
 
 # Usage example:
 # cache = Cache()
-# key = cache.store("example")
-# value = cache.get_str(key)
-# print(value)  # Output: example
-# count = cache._redis.get("Cache.store:calls")
-# print(count)  # Output: b'1'
-# inputs = cache._redis.lrange("Cache.store:inputs", 0, -1)
-# print(inputs)  # Output: [b"('example',)"]
-# outputs = cache._redis.lrange("Cache.store:outputs", 0, -1)
-# print(outputs)  # Output: [b'<generated_key>']
+# cache.store("foo")
+# cache.store("bar")
+# cache.store(42)
+# replay(cache.store)
